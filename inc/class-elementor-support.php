@@ -9,6 +9,8 @@ class Themsah_Theme_Elementor_Support {
         add_action('elementor/init', array($this,'maybe_register_hooks'), 5);
         // Ensure editor always sees a content region
         add_action('wp', array($this,'maybe_force_content_region'));
+        // Ensure content area is always available for Elementor
+        add_action('wp', array($this,'ensure_elementor_content_area'));
     }
 
     public function maybe_register_hooks() {
@@ -32,10 +34,61 @@ class Themsah_Theme_Elementor_Support {
         if ( ! $is_editor ) return;
         add_filter('the_content', function($content){
             if ( trim($content) === '' ) {
-                return '<div style="min-height:100vh"></div>';
+                return '<div class="elementor-content-area" style="min-height: 100vh; padding: 20px; text-align: center; color: #666;">
+                    <p>محتوای المنتور در حال بارگذاری...</p>
+                    <p>Elementor content is loading...</p>
+                </div>';
             }
             return $content;
         }, 0);
+    }
+
+    /**
+     * Ensure Elementor always has access to a content area
+     */
+    public function ensure_elementor_content_area() {
+        if ( is_admin() ) return;
+        if ( ! class_exists('\\Elementor\\Plugin') ) return;
+        
+        // Check if we're in an Elementor context
+        $is_elementor_context = isset($_GET['elementor-preview']) || 
+                                isset($_GET['elementor-iframe']) || 
+                                isset($_GET['preview']) || 
+                                isset($_GET['preview_id']);
+        
+        if ( $is_elementor_context ) {
+            // Ensure the_content filter is always available
+            add_filter('the_content', function($content) {
+                // If content is empty, provide a fallback
+                if ( trim($content) === '' ) {
+                    return '<div class="elementor-content-area" style="min-height: 100vh; padding: 20px; text-align: center; color: #666;">
+                        <p>محتوای المنتور در حال بارگذاری...</p>
+                        <p>Elementor content is loading...</p>
+                    </div>';
+                }
+                return $content;
+            }, 0);
+            
+            // Add a hidden content wrapper to ensure the_content is called
+            add_action('wp_footer', function() {
+                if ( have_posts() ) {
+                    echo '<div class="elementor-content-fallback" style="display: none;">';
+                    while ( have_posts() ) {
+                        the_post();
+                        the_content();
+                    }
+                    rewind_posts();
+                    echo '</div>';
+                }
+            }, 1);
+            
+            // Add debugging information for development
+            if ( defined('WP_DEBUG') && WP_DEBUG ) {
+                add_action('wp_footer', function() {
+                    echo '<!-- Elementor Content Area Debug: Context detected, fallbacks enabled -->';
+                }, 999);
+            }
+        }
     }
 
     public function register_category($elements_manager) {

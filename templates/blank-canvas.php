@@ -13,6 +13,8 @@ if (! defined('ABSPATH')) exit;
     <style>
         /* Keep the canvas clean and full width */
         body.themsah-elementor-canvas { margin:0; padding:0; background:#fff; }
+        .elementor-content-area { min-height: 100vh; width: 100%; }
+        .elementor-content-fallback { display: none; }
     </style>
 </head>
 <body <?php body_class('themsah-elementor-canvas'); ?>>
@@ -27,14 +29,35 @@ if ( isset($_GET['elementor-preview']) ) {
 }
 
 if ( $doc_id && class_exists('Elementor\\Plugin') ) {
+    echo '<div class="elementor-content-area">';
     echo \Elementor\Plugin::instance()->frontend->get_builder_content_for_display( $doc_id );
+    echo '</div>';
 } else {
     if ( have_posts() ) {
+        echo '<div class="elementor-content-area">';
         while ( have_posts() ) {
             the_post();
             the_content();
         }
+        echo '</div>';
+    } else {
+        // Fallback content area for Elementor
+        echo '<div class="elementor-content-area" style="min-height: 100vh; padding: 20px; text-align: center; color: #666;">
+            <p>محتوای المنتور در حال بارگذاری...</p>
+            <p>Elementor content is loading...</p>
+        </div>';
     }
+}
+
+// Ensure the_content is always called for Elementor
+if ( have_posts() ) {
+    echo '<div class="elementor-content-fallback">';
+    while ( have_posts() ) {
+        the_post();
+        the_content();
+    }
+    rewind_posts();
+    echo '</div>';
 }
 ?>
 <?php wp_footer(); ?>

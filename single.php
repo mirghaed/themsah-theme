@@ -29,6 +29,16 @@ get_header();
                 <?php endif; ?>
             </div>
         <?php endwhile; endif; ?>
+    <?php else : ?>
+        <!-- Elementor content area fallback -->
+        <div class="elementor-content-area">
+            <?php 
+            // Ensure the_content is called even when Elementor template is rendered
+            if ( have_posts() ) : while ( have_posts() ) : the_post(); 
+                the_content(); 
+            endwhile; endif; 
+            ?>
+        </div>
     <?php endif; ?>
 </main>
 <?php

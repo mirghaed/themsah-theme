@@ -39,6 +39,47 @@ add_action('admin_init', function(){
     }
 }, 1);
 
+// Helper function to ensure Elementor content area is always available
+function themsah_ensure_elementor_content_area() {
+    if ( ! class_exists('\\Elementor\\Plugin') ) return;
+    
+    // Check if we're in an Elementor context
+    $is_elementor_context = isset($_GET['elementor-preview']) || 
+                            isset($_GET['elementor-iframe']) || 
+                            isset($_GET['preview']) || 
+                            isset($_GET['preview_id']);
+    
+    if ( $is_elementor_context ) {
+        // Ensure the_content filter is always available
+        add_filter('the_content', function($content) {
+            // If content is empty, provide a fallback
+            if ( trim($content) === '' ) {
+                return '<div class="elementor-content-area" style="min-height: 100vh; padding: 20px; text-align: center; color: #666;">
+                    <p>محتوای المنتور در حال بارگذاری...</p>
+                    <p>Elementor content is loading...</p>
+                </div>';
+            }
+            return $content;
+        }, 0);
+        
+        // Add a hidden content wrapper to ensure the_content is called
+        add_action('wp_footer', function() {
+            if ( have_posts() ) {
+                echo '<div class="elementor-content-fallback" style="display: none;">';
+                while ( have_posts() ) {
+                    the_post();
+                    the_content();
+                }
+                rewind_posts();
+                echo '</div>';
+            }
+        }, 1);
+    }
+}
+
+// Call the helper function early
+add_action('wp', 'themsah_ensure_elementor_content_area', 1);
+
 // Admin notice for Elementor if missing
 add_action('admin_notices', function(){
     if ( ! current_user_can('install_plugins') ) return;

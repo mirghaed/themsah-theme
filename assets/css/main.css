@@ -33,3 +33,102 @@ body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica N
 
 /* Admin options UI components can be shared here if needed */
 
+/* Elementor Content Area Styles */
+.elementor-content-area {
+    min-height: 100vh;
+    width: 100%;
+    position: relative;
+}
+
+.elementor-content-area:empty::before {
+    content: "محتوای المنتور در حال بارگذاری...";
+    display: block;
+    text-align: center;
+    padding: 50px 20px;
+    color: #666;
+    font-size: 16px;
+}
+
+/* Ensure Elementor content is properly displayed */
+.elementor-content-area .elementor {
+    width: 100%;
+}
+
+/* Fallback for when Elementor content is loading */
+.elementor-content-area .elementor-loading {
+    text-align: center;
+    padding: 50px 20px;
+    color: #666;
+}
+
+/* RTL Support for Persian text */
+.elementor-content-area {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Responsive design for Elementor content */
+@media (max-width: 768px) {
+    .elementor-content-area {
+        padding: 0 15px;
+    }
+}
+
+/* Hidden fallback content for Elementor */
+.elementor-content-fallback,
+.elementor-content-wrapper {
+    display: none !important;
+}
+
+/* Ensure Elementor canvas templates work properly */
+body.themsah-elementor-canvas .elementor-content-area {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+}
+
+/* Loading state for Elementor content */
+.elementor-content-area:empty {
+    background: #f9f9f9;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    margin: 20px;
+}
+
+.elementor-content-area:empty::before {
+    content: "محتوای المنتور در حال بارگذاری...\AElementor content is loading...";
+    white-space: pre-line;
+    display: block;
+    text-align: center;
+    padding: 50px 20px;
+    color: #666;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* Main content area for Elementor */
+.elementor-main-content-area {
+    min-height: 100vh;
+    width: 100%;
+    position: relative;
+    background: #fff;
+}
+
+.elementor-main-content-area:empty::before {
+    content: "محتوای المنتور در حال بارگذاری...\AElementor content is loading...";
+    white-space: pre-line;
+    display: block;
+    text-align: center;
+    padding: 50px 20px;
+    color: #666;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* Ensure proper spacing and layout */
+.elementor-main-content-area .elementor {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+

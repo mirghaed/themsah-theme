@@ -84,6 +84,62 @@ class Themsah_Theme_Template_Loader {
         if ( is_array($pt) ) { $pt = reset($pt); }
         $template_id = self::get_archive_template_id( $pt );
         if ( $template_id && Themsah_Theme_Elementor_Support::render_template( $template_id ) ) {
+            // Ensure the_content is available for Elementor
+            add_filter('the_content', function($content) {
+                // If content is empty, provide a fallback content area for Elementor
+                if ( trim($content) === '' ) {
+                    return '<div class="elementor-content-area" style="min-height: 100vh;"></div>';
+                }
+                return $content;
+            }, 0);
+            
+            // Add a filter to ensure the_content is always called
+            add_action('wp_footer', function() {
+                if ( have_posts() ) {
+                    while ( have_posts() ) {
+                        the_post();
+                        // This ensures Elementor can find the content area
+                        echo '<div class="elementor-content-wrapper" style="display: none;">';
+                        the_content();
+                        echo '</div>';
+                    }
+                    rewind_posts();
+                }
+            }, 1);
+            
+            // Force the_content to be available in the main loop
+            add_action('wp', function() {
+                if ( have_posts() ) {
+                    while ( have_posts() ) {
+                        the_post();
+                        // Ensure the_content is called at least once
+                        $content = get_the_content();
+                        if ( empty($content) ) {
+                            // Add a fallback content area
+                            echo '<div class="elementor-content-area" style="min-height: 100vh; padding: 20px; text-align: center; color: #666;">
+                                <p>محتوای المنتور در حال بارگذاری...</p>
+                                <p>Elementor content is loading...</p>
+                            </div>';
+                        }
+                    }
+                    rewind_posts();
+                }
+            }, 1);
+            
+            // Ensure the main content area is available for Elementor
+            add_action('wp', function() {
+                echo '<div class="elementor-main-content-area" style="min-height: 100vh;">';
+                // This ensures Elementor can find the main content area
+                if ( have_posts() ) {
+                    while ( have_posts() ) {
+                        the_post();
+                        the_content();
+                    }
+                    rewind_posts();
+                }
+                echo '</div>';
+            }, 1);
+            
             return true;
         }
         return false;
@@ -93,6 +149,62 @@ class Themsah_Theme_Template_Loader {
         $pt = get_post_type() ?: 'post';
         $template_id = self::get_single_template_id( $pt );
         if ( $template_id && Themsah_Theme_Elementor_Support::render_template( $template_id ) ) {
+            // Ensure the_content is available for Elementor
+            add_filter('the_content', function($content) {
+                // If content is empty, provide a fallback content area for Elementor
+                if ( trim($content) === '' ) {
+                    return '<div class="elementor-content-area" style="min-height: 100vh;"></div>';
+                }
+                return $content;
+            }, 0);
+            
+            // Add a filter to ensure the_content is always called
+            add_action('wp_footer', function() {
+                if ( have_posts() ) {
+                    while ( have_posts() ) {
+                        the_post();
+                        // This ensures Elementor can find the content area
+                        echo '<div class="elementor-content-wrapper" style="display: none;">';
+                        the_content();
+                        echo '</div>';
+                    }
+                    rewind_posts();
+                }
+            }, 1);
+            
+            // Force the_content to be available in the main loop
+            add_action('wp', function() {
+                if ( have_posts() ) {
+                    while ( have_posts() ) {
+                        the_post();
+                        // Ensure the_content is called at least once
+                        $content = get_the_content();
+                        if ( empty($content) ) {
+                            // Add a fallback content area
+                            echo '<div class="elementor-content-area" style="min-height: 100vh; padding: 20px; text-align: center; color: #666;">
+                                <p>محتوای المنتور در حال بارگذاری...</p>
+                                <p>Elementor content is loading...</p>
+                            </div>';
+                        }
+                    }
+                    rewind_posts();
+                }
+            }, 1);
+            
+            // Ensure the main content area is available for Elementor
+            add_action('wp', function() {
+                echo '<div class="elementor-main-content-area" style="min-height: 100vh;">';
+                // This ensures Elementor can find the main content area
+                if ( have_posts() ) {
+                    while ( have_posts() ) {
+                        the_post();
+                        the_content();
+                    }
+                    rewind_posts();
+                }
+                echo '</div>';
+            }, 1);
+            
             return true;
         }
         return false;
