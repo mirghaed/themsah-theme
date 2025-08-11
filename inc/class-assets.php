@@ -15,10 +15,12 @@ class Themsah_Theme_Assets {
         wp_enqueue_style('themsah-style', get_template_directory_uri() . '/assets/css/main.css', array(), file_exists($css_path) ? filemtime($css_path) : '1.3.0' );
         wp_enqueue_script('themsah-main', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.2', true);
 
-        // Load default Vazirmatn font from CDN when no custom font is configured
-        $custom_fonts = Themsah_Theme_Options::get_option('custom_fonts', array());
-        $use_custom_fonts = ! empty($custom_fonts['family']) && ! empty($custom_fonts['weights']) && is_array($custom_fonts['weights']);
-        if ( ! $use_custom_fonts ) {
+        // Load default Vazirmatn font from CDN when no custom font is configured (legacy or new schema)
+        $custom_fonts      = Themsah_Theme_Options::get_option('custom_fonts', array());
+        $custom_fonts_list = Themsah_Theme_Options::get_option('custom_fonts_list', array());
+        $use_custom_fonts_legacy = ! empty($custom_fonts['family']) && ! empty($custom_fonts['weights']) && is_array($custom_fonts['weights']);
+        $use_custom_fonts_new    = is_array($custom_fonts_list) && ! empty($custom_fonts_list);
+        if ( ! $use_custom_fonts_legacy && ! $use_custom_fonts_new ) {
             wp_enqueue_style('themsah-vazirmatn', 'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css', array(), 'v33.003');
         }
         // basic layout CSS for single with sidebar
@@ -31,29 +33,71 @@ class Themsah_Theme_Assets {
         $hover = Themsah_Theme_Options::get_option('hover_color', '#1f49c9');
         $text = Themsah_Theme_Options::get_option('text_color', '#222222');
         $text_hover = Themsah_Theme_Options::get_option('text_hover_color', '#111111');
-        $custom_fonts = Themsah_Theme_Options::get_option('custom_fonts', array());
-        $use_custom_fonts = ! empty($custom_fonts['family']) && ! empty($custom_fonts['weights']) && is_array($custom_fonts['weights']);
+        $custom_fonts      = Themsah_Theme_Options::get_option('custom_fonts', array());
+        $custom_fonts_list = Themsah_Theme_Options::get_option('custom_fonts_list', array());
+        $use_custom_fonts_legacy = ! empty($custom_fonts['family']) && ! empty($custom_fonts['weights']) && is_array($custom_fonts['weights']);
+        $use_custom_fonts_new    = is_array($custom_fonts_list) && ! empty($custom_fonts_list);
 
         $css  = ":root{--mytheme-primary:{$primary};--mytheme-hover:{$hover};--mytheme-text:{$text};--mytheme-text-hover:{$text_hover}} body{color:var(--mytheme-text)} .mytheme-btn{background:var(--mytheme-primary);} a:hover{color:var(--mytheme-hover)} .mytheme-btn:hover{background:var(--mytheme-hover)} a{color:var(--mytheme-text)} a:hover{color:var(--mytheme-text-hover)}";
 
-        if ( $use_custom_fonts ) {
+        if ( $use_custom_fonts_legacy || $use_custom_fonts_new ) {
             $families_printed = array();
-            $family = trim($custom_fonts['family']);
-            foreach ( $custom_fonts['weights'] as $font ) {
-                $weight = isset($font['weight']) ? intval($font['weight']) : 400;
-                $woff2  = isset($font['woff2']) ? esc_url($font['woff2']) : '';
-                $woff   = isset($font['woff']) ? esc_url($font['woff']) : '';
-                $ttf    = isset($font['ttf']) ? esc_url($font['ttf']) : '';
-                if ( ! $family || ( ! $woff2 && ! $woff && ! $ttf ) ) {
-                    continue;
+            // New schema: multiple families
+            if ( $use_custom_fonts_new ) {
+                foreach ( $custom_fonts_list as $family_conf ) {
+                    $family = isset($family_conf['family']) ? trim($family_conf['family']) : '';
+                    if ( $family === '' ) continue;
+                    $type = isset($family_conf['type']) ? $family_conf['type'] : 'static';
+                    if ( $type === 'variable' ) {
+                        $min = isset($family_conf['min']) ? intval($family_conf['min']) : 100;
+                        $max = isset($family_conf['max']) ? intval($family_conf['max']) : 900;
+                        $woff2 = isset($family_conf['woff2']) ? esc_url($family_conf['woff2']) : '';
+                        $woff  = isset($family_conf['woff']) ? esc_url($family_conf['woff']) : '';
+                        if ( $woff2 || $woff ) {
+                            $src_parts = array();
+                            if ( $woff2 ) $src_parts[] = "url('{$woff2}') format('woff2')";
+                            if ( $woff )  $src_parts[] = "url('{$woff}') format('woff')";
+                            $src = implode(', ', $src_parts);
+                            $css .= "@font-face{font-family:'" . esc_attr($family) . "';font-display:swap;src:".$src.";font-weight:".intval($min)." ".intval($max).";font-style:normal;}";
+                            $families_printed[$family] = true;
+                        }
+                    } else {
+                        if ( ! empty($family_conf['weights']) && is_array($family_conf['weights']) ) {
+                            foreach ( $family_conf['weights'] as $wrow ) {
+                                $weight = isset($wrow['weight']) ? intval($wrow['weight']) : 400;
+                                $woff2  = isset($wrow['woff2']) ? esc_url($wrow['woff2']) : '';
+                                $woff   = isset($wrow['woff']) ? esc_url($wrow['woff']) : '';
+                                if ( ! $woff2 && ! $woff ) continue;
+                                $src_parts = array();
+                                if ( $woff2 ) $src_parts[] = "url('{$woff2}') format('woff2')";
+                                if ( $woff )  $src_parts[] = "url('{$woff}') format('woff')";
+                                $src = implode(', ', $src_parts);
+                                $css .= "@font-face{font-family:'" . esc_attr($family) . "';font-display:swap;src:".$src.";font-weight:".$weight.";font-style:normal;}";
+                                $families_printed[$family] = true;
+                            }
+                        }
+                    }
                 }
-                $src_parts = array();
-                if ( $woff2 ) $src_parts[] = "url('{$woff2}') format('woff2')";
-                if ( $woff )  $src_parts[] = "url('{$woff}') format('woff')";
-                if ( $ttf )   $src_parts[] = "url('{$ttf}') format('truetype')";
-                $src = implode(', ', $src_parts);
-                $css .= "@font-face{font-family:'" . esc_attr($family) . "';font-display:swap;src:".$src.";font-weight:".$weight.";font-style:normal;}";
-                $families_printed[ $family ] = true;
+            }
+            // Legacy single family (still supported)
+            if ( $use_custom_fonts_legacy ) {
+                $family = trim($custom_fonts['family']);
+                foreach ( $custom_fonts['weights'] as $font ) {
+                    $weight = isset($font['weight']) ? intval($font['weight']) : 400;
+                    $woff2  = isset($font['woff2']) ? esc_url($font['woff2']) : '';
+                    $woff   = isset($font['woff']) ? esc_url($font['woff']) : '';
+                    $ttf    = isset($font['ttf']) ? esc_url($font['ttf']) : '';
+                    if ( ! $family || ( ! $woff2 && ! $woff && ! $ttf ) ) {
+                        continue;
+                    }
+                    $src_parts = array();
+                    if ( $woff2 ) $src_parts[] = "url('{$woff2}') format('woff2')";
+                    if ( $woff )  $src_parts[] = "url('{$woff}') format('woff')";
+                    if ( $ttf )   $src_parts[] = "url('{$ttf}') format('truetype')";
+                    $src = implode(', ', $src_parts);
+                    $css .= "@font-face{font-family:'" . esc_attr($family) . "';font-display:swap;src:".$src.";font-weight:".$weight.";font-style:normal;}";
+                    $families_printed[ $family ] = true;
+                }
             }
             if ( ! empty($families_printed) ) {
                 $families = array_keys($families_printed);
@@ -90,9 +134,11 @@ class Themsah_Theme_Assets {
 
     public function admin_styles() {
         // Apply Vazirmatn in admin when no custom font is set
-        $custom_fonts = Themsah_Theme_Options::get_option('custom_fonts', array());
-        $use_custom_fonts = ! empty($custom_fonts['family']) && ! empty($custom_fonts['weights']) && is_array($custom_fonts['weights']);
-        if ( ! $use_custom_fonts ) {
+        $custom_fonts      = Themsah_Theme_Options::get_option('custom_fonts', array());
+        $custom_fonts_list = Themsah_Theme_Options::get_option('custom_fonts_list', array());
+        $use_custom_fonts_legacy = ! empty($custom_fonts['family']) && ! empty($custom_fonts['weights']) && is_array($custom_fonts['weights']);
+        $use_custom_fonts_new    = is_array($custom_fonts_list) && ! empty($custom_fonts_list);
+        if ( ! $use_custom_fonts_legacy && ! $use_custom_fonts_new ) {
             wp_enqueue_style('themsah-vazirmatn-admin', 'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css', array(), 'v33.003');
             if ( ! wp_style_is('themsah-admin-base','registered') ) {
                 wp_register_style('themsah-admin-base', false);

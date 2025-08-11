@@ -19,21 +19,23 @@
 .themsah-admin-wrap .regular-text{border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px}
 .themsah-admin-wrap textarea.large-text{border:1px solid #e5e7eb;border-radius:10px}
 
-/* Fonts repeater table */
-.themsah-admin-wrap #themsah-fonts-repeater{width:100%;table-layout:fixed;border-collapse:collapse}
-.themsah-admin-wrap #themsah-fonts-repeater th,.themsah-admin-wrap #themsah-fonts-repeater td{vertical-align:middle;border-bottom:1px solid #eef2f7;padding:8px}
-.themsah-admin-wrap #themsah-fonts-repeater th:nth-child(1),
-.themsah-admin-wrap #themsah-fonts-repeater td:nth-child(1){width:120px}
-.themsah-admin-wrap #themsah-fonts-repeater th:nth-child(2),
-.themsah-admin-wrap #themsah-fonts-repeater td:nth-child(2){width:28%}
-.themsah-admin-wrap #themsah-fonts-repeater th:nth-child(3),
-.themsah-admin-wrap #themsah-fonts-repeater td:nth-child(3){width:28%}
-.themsah-admin-wrap #themsah-fonts-repeater th:nth-child(4),
-.themsah-admin-wrap #themsah-fonts-repeater td:nth-child(4){width:28%}
-.themsah-admin-wrap #themsah-fonts-repeater th:nth-child(5),
-.themsah-admin-wrap #themsah-fonts-repeater td:nth-child(5){width:60px;text-align:center}
-.themsah-admin-wrap #themsah-fonts-repeater .regular-text{width:100%}
-.themsah-admin-wrap #themsah-fonts-repeater .themsah-media-upload{margin-top:6px}
+/* Fonts UI (multi-family) */
+.themsah-admin-wrap #themsah-fonts-families{display:flex;flex-direction:column;gap:18px}
+.themsah-admin-wrap .themsah-font-family{border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:#f9fafb}
+.themsah-admin-wrap .themsah-font-family .family-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.themsah-admin-wrap .themsah-font-family .family-static-fields .themsah-fonts-repeater{width:100%;table-layout:fixed;border-collapse:collapse}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater th,
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater td{vertical-align:middle;border-bottom:1px solid #eef2f7;padding:8px}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater th:nth-child(1),
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater td:nth-child(1){width:120px}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater th:nth-child(2),
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater td:nth-child(2){width:35%}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater th:nth-child(3),
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater td:nth-child(3){width:35%}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater th:nth-child(4),
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater td:nth-child(4){width:60px;text-align:center}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater .regular-text{width:100%}
+.themsah-admin-wrap .themsah-font-family .themsah-fonts-repeater .themsah-media-upload{margin-top:6px}
 
 /* Toast */
 .themsah-toast{position:fixed;z-index:999999;bottom:24px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 8px 20px rgba(2,6,23,.2);display:none}

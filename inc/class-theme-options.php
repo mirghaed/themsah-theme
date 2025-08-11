@@ -30,8 +30,8 @@ class Themsah_Theme_Options {
         if ( strpos($hook, 'themsah-settings') === false ) return;
         wp_enqueue_style('wp-color-picker');
         wp_enqueue_media();
-        wp_enqueue_script('themsah-admin-options', get_template_directory_uri() . '/assets/js/admin-options.js', array('jquery','wp-color-picker'), '1.2', true);
-        wp_enqueue_style('themsah-admin-options', get_template_directory_uri() . '/assets/css/admin-options.css', array(), '1.2');
+        wp_enqueue_script('themsah-admin-options', get_template_directory_uri() . '/assets/js/admin-options.js', array('jquery','wp-color-picker'), '1.3.0', true);
+        wp_enqueue_style('themsah-admin-options', get_template_directory_uri() . '/assets/css/admin-options.css', array(), '1.3.0');
         wp_localize_script('themsah-admin-options', 'THEMSAH_OPTIONS', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('themsah_options_save'),
@@ -72,10 +72,10 @@ class Themsah_Theme_Options {
                 $output['single_templates'][sanitize_key($pt)] = absint($tid);
             }
         }
-        // Custom fonts: family + weights rows [{weight, woff2, woff, ttf}]
+        // Legacy single-family custom font (kept for backward compatibility)
         $output['custom_fonts'] = array();
-        $family = isset($input['custom_fonts']['family']) ? sanitize_text_field($input['custom_fonts']['family']) : '';
-        $output['custom_fonts']['family'] = $family;
+        $legacy_family = isset($input['custom_fonts']['family']) ? sanitize_text_field($input['custom_fonts']['family']) : '';
+        $output['custom_fonts']['family'] = $legacy_family;
         $output['custom_fonts']['weights'] = array();
         if ( isset($input['custom_fonts']['weights']) && is_array($input['custom_fonts']['weights']) ) {
             foreach ( $input['custom_fonts']['weights'] as $row ) {
@@ -88,11 +88,76 @@ class Themsah_Theme_Options {
                 }
             }
         }
+
+        // New: Multiple font families with support for variable fonts
+        $output['custom_fonts_list'] = array();
+        if ( isset($input['custom_fonts_list']) && is_array($input['custom_fonts_list']) ) {
+            foreach ( $input['custom_fonts_list'] as $family_row ) {
+                $family_name = isset($family_row['family']) ? sanitize_text_field($family_row['family']) : '';
+                if ( $family_name === '' ) continue;
+                $type = isset($family_row['type']) && $family_row['type'] === 'variable' ? 'variable' : 'static';
+                $clean = array(
+                    'family' => $family_name,
+                    'type'   => $type,
+                );
+                if ( $type === 'variable' ) {
+                    $min = isset($family_row['min']) ? max(100, min(900, intval($family_row['min']))) : 100;
+                    $max = isset($family_row['max']) ? max($min, min(900, intval($family_row['max']))) : 900;
+                    $vw2 = isset($family_row['woff2']) ? esc_url_raw($family_row['woff2']) : '';
+                    $vw  = isset($family_row['woff']) ? esc_url_raw($family_row['woff']) : '';
+                    if ( $vw2 || $vw ) {
+                        $clean['min']  = $min;
+                        $clean['max']  = $max;
+                        $clean['woff2'] = $vw2;
+                        $clean['woff']  = $vw;
+                        $output['custom_fonts_list'][] = $clean;
+                    }
+                } else {
+                    $weights_clean = array();
+                    if ( isset($family_row['weights']) && is_array($family_row['weights']) ) {
+                        foreach ( $family_row['weights'] as $wrow ) {
+                            $weight = isset($wrow['weight']) ? intval($wrow['weight']) : 400;
+                            $woff2 = isset($wrow['woff2']) ? esc_url_raw($wrow['woff2']) : '';
+                            $woff  = isset($wrow['woff']) ? esc_url_raw($wrow['woff']) : '';
+                            if ( $weight && ($woff2 || $woff) ) {
+                                $weights_clean[] = array(
+                                    'weight' => $weight,
+                                    'woff2'  => $woff2,
+                                    'woff'   => $woff,
+                                );
+                            }
+                        }
+                    }
+                    if ( ! empty($weights_clean) ) {
+                        $clean['weights'] = $weights_clean;
+                        $output['custom_fonts_list'][] = $clean;
+                    }
+                }
+            }
+        }
+        // If new list is empty but legacy single-family exists, try to migrate into list silently
+        if ( empty($output['custom_fonts_list']) && ! empty($output['custom_fonts']['family']) && ! empty($output['custom_fonts']['weights']) ) {
+            $migrated_weights = array();
+            foreach ( $output['custom_fonts']['weights'] as $wrow ) {
+                $migrated_weights[] = array(
+                    'weight' => intval($wrow['weight']),
+                    'woff2'  => isset($wrow['woff2']) ? $wrow['woff2'] : '',
+                    'woff'   => isset($wrow['woff']) ? $wrow['woff'] : '',
+                );
+            }
+            if ( ! empty($migrated_weights) ) {
+                $output['custom_fonts_list'][] = array(
+                    'family'  => $output['custom_fonts']['family'],
+                    'type'    => 'static',
+                    'weights' => $migrated_weights,
+                );
+            }
+        }
         return $output;
     }
 
     public static function get_option( $key, $default = '' ) {
-        $opts = get_option('mytheme_options', array());
+        $opts = self::get_all_options();
         if ( isset($opts[$key]) ) return $opts[$key];
         return $default;
     }
@@ -113,6 +178,7 @@ class Themsah_Theme_Options {
             'archive_templates' => array(),
             'single_templates' => array(),
             'custom_fonts' => array('family' => '', 'weights' => array()),
+            'custom_fonts_list' => array(),
             'single_sidebar_position' => 'right',
             'single_sidebar_elementor' => '',
         ));
@@ -122,6 +188,9 @@ class Themsah_Theme_Options {
         } else {
             if ( ! isset($opts['custom_fonts']['family']) ) $opts['custom_fonts']['family'] = '';
             if ( ! isset($opts['custom_fonts']['weights']) || ! is_array($opts['custom_fonts']['weights']) ) $opts['custom_fonts']['weights'] = array();
+        }
+        if ( ! isset($opts['custom_fonts_list']) || ! is_array($opts['custom_fonts_list']) ) {
+            $opts['custom_fonts_list'] = array();
         }
         if ( ! isset($opts['single_sidebar_position']) ) {
             $opts['single_sidebar_position'] = 'right';
@@ -303,51 +372,96 @@ class Themsah_Theme_Options {
                     </div>
 
                     <div class="themsah-tab-content" id="tab-fonts">
-                        <p class="description"><?php esc_html_e('نام فونت را تعیین کنید سپس برای هر وزن، فرمت‌های woff2/woff/ttf را بارگذاری کنید.', 'themsah-theme'); ?></p>
-                        <table class="form-table">
-                            <tr>
-                                <th><?php esc_html_e('نام خانواده فونت', 'themsah-theme'); ?></th>
-                                <td><input type="text" name="themsah_theme_options[custom_fonts][family]" value="<?php echo esc_attr( isset($opts['custom_fonts']['family']) ? $opts['custom_fonts']['family'] : '' ); ?>" class="regular-text" placeholder="مثال: IRANSansX" /></td>
-                            </tr>
-                        </table>
-                        <table class="form-table" id="themsah-fonts-repeater">
-                            <thead>
-                                <tr>
-                                    <th><?php esc_html_e('وزن', 'themsah-theme'); ?></th>
-                                    <th><?php esc_html_e('WOFF2', 'themsah-theme'); ?></th>
-                                    <th><?php esc_html_e('WOFF', 'themsah-theme'); ?></th>
-                                    <th><?php esc_html_e('TTF', 'themsah-theme'); ?></th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if ( ! empty($opts['custom_fonts']['weights']) ) : foreach ( $opts['custom_fonts']['weights'] as $index => $font ) : ?>
-                                <tr>
-                                    <td>
-                                        <select name="themsah_theme_options[custom_fonts][weights][<?php echo esc_attr($index); ?>][weight]">
-                                            <?php for($w=100;$w<=900;$w+=100): ?>
-                                                <option value="<?php echo $w; ?>" <?php selected( (int)$font['weight'], $w ); ?>><?php echo $w; ?></option>
-                                            <?php endfor; ?>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts][weights][<?php echo esc_attr($index); ?>][woff2]" value="<?php echo esc_url($font['woff2'] ?? ''); ?>" />
-                                        <button class="button themsah-media-upload" data-target="woff2"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
-                                    </td>
-                                    <td>
-                                        <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts][weights][<?php echo esc_attr($index); ?>][woff]" value="<?php echo esc_url($font['woff'] ?? ''); ?>" />
-                                        <button class="button themsah-media-upload" data-target="woff"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
-                                    </td>
-                                    <td>
-                                        <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts][weights][<?php echo esc_attr($index); ?>][ttf]" value="<?php echo esc_url($font['ttf'] ?? ''); ?>" />
-                                        <button class="button themsah-media-upload" data-target="ttf"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
-                                    </td>
-                                    <td><button class="button button-link-delete themsah-font-remove">&times;</button></td>
-                                </tr>
-                                <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                        <p><button class="button" id="themsah-font-add">+ <?php esc_html_e('افزودن وزن فونت', 'themsah-theme'); ?></button></p>
+                        <p class="description"><?php esc_html_e('می‌توانید چند خانواده فونت اضافه کنید. برای هر خانواده می‌توانید نوع فونت را "ساده" یا "Variable" انتخاب کنید. برای Variable نیازی به افزودن وزن‌های جداگانه نیست.', 'themsah-theme'); ?></p>
+                        <div id="themsah-fonts-families">
+                            <?php if ( ! empty($opts['custom_fonts_list']) ) : foreach ( $opts['custom_fonts_list'] as $fi => $fam ) : ?>
+                            <div class="themsah-font-family" data-index="<?php echo esc_attr($fi); ?>">
+                                <div class="family-head">
+                                    <strong><?php esc_html_e('خانواده فونت', 'themsah-theme'); ?></strong>
+                                    <button class="button button-link-delete themsah-font-family-remove" type="button">&times;</button>
+                                </div>
+                                <table class="form-table">
+                                    <tr>
+                                        <th><?php esc_html_e('نام خانواده', 'themsah-theme'); ?></th>
+                                        <td><input type="text" class="regular-text" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][family]" value="<?php echo esc_attr( isset($fam['family']) ? $fam['family'] : '' ); ?>" placeholder="مثال: IRANSansX" /></td>
+                                    </tr>
+                                    <tr>
+                                        <th><?php esc_html_e('نوع فونت', 'themsah-theme'); ?></th>
+                                        <td>
+                                            <?php $type = isset($fam['type']) ? $fam['type'] : 'static'; ?>
+                                            <label><input type="radio" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][type]" value="static" <?php checked($type,'static'); ?> class="family-type-radio"> <?php esc_html_e('ساده', 'themsah-theme'); ?></label>
+                                            &nbsp; &nbsp;
+                                            <label><input type="radio" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][type]" value="variable" <?php checked($type,'variable'); ?> class="family-type-radio"> <?php esc_html_e('Variable', 'themsah-theme'); ?></label>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <div class="family-static-fields" style="display: <?php echo ($type==='static' ? 'block':'none'); ?>">
+                                    <table class="form-table themsah-fonts-repeater" data-family-index="<?php echo esc_attr($fi); ?>">
+                                        <thead>
+                                            <tr>
+                                                <th><?php esc_html_e('وزن', 'themsah-theme'); ?></th>
+                                                <th><?php esc_html_e('WOFF2', 'themsah-theme'); ?></th>
+                                                <th><?php esc_html_e('WOFF', 'themsah-theme'); ?></th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if ( ! empty($fam['weights']) && is_array($fam['weights']) ) : foreach ( $fam['weights'] as $wi => $wrow ) : ?>
+                                            <tr>
+                                                <td>
+                                                    <select name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][weights][<?php echo esc_attr($wi); ?>][weight]">
+                                                        <?php for($w=100;$w<=900;$w+=100): ?>
+                                                        <option value="<?php echo $w; ?>" <?php selected( (int)$wrow['weight'], $w ); ?>><?php echo $w; ?></option>
+                                                        <?php endfor; ?>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][weights][<?php echo esc_attr($wi); ?>][woff2]" value="<?php echo esc_url( isset($wrow['woff2']) ? $wrow['woff2'] : '' ); ?>" />
+                                                    <button class="button themsah-media-upload" type="button"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][weights][<?php echo esc_attr($wi); ?>][woff]" value="<?php echo esc_url( isset($wrow['woff']) ? $wrow['woff'] : '' ); ?>" />
+                                                    <button class="button themsah-media-upload" type="button"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
+                                                </td>
+                                                <td><button class="button button-link-delete themsah-font-remove" type="button">&times;</button></td>
+                                            </tr>
+                                            <?php endforeach; endif; ?>
+                                        </tbody>
+                                    </table>
+                                    <p><button class="button themsah-font-add-weight" type="button" data-family-index="<?php echo esc_attr($fi); ?>">+ <?php esc_html_e('افزودن وزن فونت', 'themsah-theme'); ?></button></p>
+                                </div>
+                                <div class="family-variable-fields" style="display: <?php echo ($type==='variable' ? 'block':'none'); ?>">
+                                    <table class="form-table">
+                                        <tr>
+                                            <th><?php esc_html_e('بازه وزن', 'themsah-theme'); ?></th>
+                                            <td>
+                                                <input type="number" min="1" max="1000" step="1" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][min]" value="<?php echo isset($fam['min']) ? intval($fam['min']) : 100; ?>" style="width:100px"> -
+                                                <input type="number" min="1" max="1000" step="1" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][max]" value="<?php echo isset($fam['max']) ? intval($fam['max']) : 900; ?>" style="width:100px">
+                                                <p class="description"><?php esc_html_e('معمولاً 100 تا 900', 'themsah-theme'); ?></p>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th><?php esc_html_e('فایل WOFF2', 'themsah-theme'); ?></th>
+                                            <td>
+                                                <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][woff2]" value="<?php echo esc_url( isset($fam['woff2']) ? $fam['woff2'] : '' ); ?>" />
+                                                <button class="button themsah-media-upload" type="button"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th><?php esc_html_e('فایل WOFF (اختیاری)', 'themsah-theme'); ?></th>
+                                            <td>
+                                                <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list][<?php echo esc_attr($fi); ?>][woff]" value="<?php echo esc_url( isset($fam['woff']) ? $fam['woff'] : '' ); ?>" />
+                                                <button class="button themsah-media-upload" type="button"><?php esc_html_e('انتخاب', 'themsah-theme'); ?></button>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <?php endforeach; endif; ?>
+                        </div>
+                        <p><button class="button button-primary" id="themsah-font-family-add" type="button">+ <?php esc_html_e('افزودن خانواده فونت', 'themsah-theme'); ?></button></p>
+                        <hr />
+                        <p class="description"><?php esc_html_e('سازگاری با نسخه قدیمی: در صورت نیاز، تنظیمات قدیمی (یک خانواده با وزن‌های مختلف) همچنان ذخیره می‌شود، اما توصیه می‌شود از بخش جدید استفاده کنید.', 'themsah-theme'); ?></p>
                     </div>
                 </div>
 

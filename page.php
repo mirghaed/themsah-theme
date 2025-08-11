@@ -1,8 +1,4 @@
 <?php
-if ( class_exists('Themsah_Theme_Template_Loader') && Themsah_Theme_Template_Loader::is_elementor_preview_context() ) {
-    include get_template_directory() . '/templates/blank-canvas.php';
-    return;
-}
 get_header();
 ?>
 <main class="container">

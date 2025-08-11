@@ -23,6 +23,22 @@ new Themsah_Theme_Template_Loader();
 new Themsah_Theme_Options();
 new Themsah_Theme_Meta_Boxes();
 
+// Invalidate OPcache for all theme PHP files in admin (prevents stale code during development)
+add_action('admin_init', function(){
+    if ( ! function_exists('opcache_invalidate') ) return;
+    try {
+        $dir = new RecursiveDirectoryIterator(THEMSAH_THEME_DIR, FilesystemIterator::SKIP_DOTS);
+        foreach ( new RecursiveIteratorIterator($dir) as $file ) {
+            $path = (string) $file;
+            if ( substr($path, -4) === '.php' ) {
+                @opcache_invalidate($path, true);
+            }
+        }
+    } catch (Throwable $e) {
+        // ignore
+    }
+}, 1);
+
 // Admin notice for Elementor if missing
 add_action('admin_notices', function(){
     if ( ! current_user_can('install_plugins') ) return;
@@ -40,52 +56,7 @@ add_action('admin_notices', function(){
     echo '<div class="notice notice-warning"><p>'. esc_html__('قالب تمساح برای عملکرد کامل به افزونه Elementor نیاز دارد.', 'themsah-theme') .' '. $cta .'</p></div>';
 });
 
-// Force blank canvas for Elementor library previews as early as possible
-if ( ! function_exists('themsah_is_elementor_preview_request') ) {
-    function themsah_is_elementor_preview_request(): bool {
-        return (
-            isset($_GET['elementor-preview']) || isset($_GET['elementor-iframe']) ||
-            isset($_GET['preview']) || isset($_GET['preview_id']) || isset($_GET['p']) || isset($_GET['elementor_library']) || isset($_GET['ver']) ||
-            ( isset($_GET['post_type']) && $_GET['post_type'] === 'elementor_library' )
-        );
-    }
-}
-
-if ( ! function_exists('themsah_maybe_load_canvas_and_exit') ) {
-    function themsah_maybe_load_canvas_and_exit() {
-        if ( themsah_is_elementor_preview_request() ) {
-            $blank = get_template_directory() . '/templates/blank-canvas.php';
-            if ( file_exists($blank) ) {
-                status_header(200);
-                load_template($blank, true);
-                exit;
-            }
-        }
-    }
-}
-
-// Super-early guards
-add_action('parse_request', function(){ themsah_maybe_load_canvas_and_exit(); }, 0);
-add_action('wp', function(){ themsah_maybe_load_canvas_and_exit(); }, 0);
-add_action('template_redirect', function(){ themsah_maybe_load_canvas_and_exit(); }, 0);
-add_filter('redirect_canonical', function($redirect_url){
-    if (
-        isset($_GET['elementor-preview']) || isset($_GET['elementor-iframe']) ||
-        isset($_GET['preview']) || isset($_GET['preview_id']) || isset($_GET['elementor_library']) || isset($_GET['p']) || isset($_GET['ver']) ||
-        ( isset($_GET['post_type']) && $_GET['post_type'] === 'elementor_library' )
-    ) {
-        return false; // prevent canonical redirects from dropping our params
-    }
-    return $redirect_url;
-}, 1, 1);
-
-add_filter('template_include', function($template){
-    $blank = get_template_directory() . '/templates/blank-canvas.php';
-    if ( file_exists($blank) && themsah_is_elementor_preview_request() ) {
-        return $blank;
-    }
-    return $template;
-}, 1);
+// Remove custom canvas routing entirely (revert to Elementor defaults)
 
 // Add Theme Settings to Admin Bar
 add_action('admin_bar_menu', function($wp_admin_bar){
@@ -98,3 +69,27 @@ add_action('admin_bar_menu', function($wp_admin_bar){
         'meta' => array('class' => 'themsah-theme-settings')
     ));
 }, 200);
+
+// Hide our internal canvas page template from Page Attributes to avoid beginners selecting it
+add_filter('theme_page_templates', function($templates){
+    foreach ($templates as $file => $label) {
+        if ( strpos($file, 'themsah-elementor-canvas.php') !== false ) {
+            unset($templates[$file]);
+        }
+    }
+    return $templates;
+});
+
+// When editing a normal Page with Elementor, if the page template was set to our internal canvas,
+// fallback to the standard page template so the_content exists and editor can load
+add_filter('page_template', function($template){
+    $is_elementor_admin_edit = is_admin() && isset($_GET['action']) && $_GET['action'] === 'elementor';
+    if ( ! $is_elementor_admin_edit ) return $template;
+    // Resolve selected template file
+    $selected = get_page_template_slug(get_queried_object_id());
+    if ( $selected && strpos($selected, 'themsah-elementor-canvas.php') !== false ) {
+        $fallback = locate_template('page.php');
+        if ( $fallback ) return $fallback;
+    }
+    return $template;
+}, 20);

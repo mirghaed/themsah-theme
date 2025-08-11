@@ -12,8 +12,8 @@ class Themsah_Theme_Template_Loader {
             $meta = get_post_meta( $post_id, '_mytheme_header_template', true );
             if ( $meta ) return $meta;
         }
-        $opts = get_option('mytheme_options', array());
-        if ( ! empty($opts['header_template']) ) return $opts['header_template'];
+        $opts = class_exists('Themsah_Theme_Options') ? Themsah_Theme_Options::get_all_options() : array();
+        if ( ! empty($opts['header_template']) ) return absint($opts['header_template']);
         return false;
     }
 
@@ -25,8 +25,8 @@ class Themsah_Theme_Template_Loader {
             $meta = get_post_meta( $post_id, '_mytheme_footer_template', true );
             if ( $meta ) return $meta;
         }
-        $opts = get_option('mytheme_options', array());
-        if ( ! empty($opts['footer_template']) ) return $opts['footer_template'];
+        $opts = class_exists('Themsah_Theme_Options') ? Themsah_Theme_Options::get_all_options() : array();
+        if ( ! empty($opts['footer_template']) ) return absint($opts['footer_template']);
         return false;
     }
 
@@ -35,7 +35,7 @@ class Themsah_Theme_Template_Loader {
             $obj = get_queried_object();
             $post_type = isset($obj->name) ? $obj->name : 'post';
         }
-        $opts = get_option('mytheme_options', array());
+        $opts = class_exists('Themsah_Theme_Options') ? Themsah_Theme_Options::get_all_options() : array();
         if ( ! empty($opts['archive_templates']) && ! empty($opts['archive_templates'][$post_type]) ) {
             return absint($opts['archive_templates'][$post_type]);
         }
@@ -46,7 +46,7 @@ class Themsah_Theme_Template_Loader {
         if ( ! $post_type ) {
             $post_type = get_post_type() ?: 'post';
         }
-        $opts = get_option('mytheme_options', array());
+        $opts = class_exists('Themsah_Theme_Options') ? Themsah_Theme_Options::get_all_options() : array();
         if ( ! empty($opts['single_templates']) && ! empty($opts['single_templates'][$post_type]) ) {
             return absint($opts['single_templates'][$post_type]);
         }
@@ -54,12 +54,12 @@ class Themsah_Theme_Template_Loader {
     }
 
     public static function get_single_sidebar_position() {
-        $opts = get_option('mytheme_options', array());
+        $opts = class_exists('Themsah_Theme_Options') ? Themsah_Theme_Options::get_all_options() : array();
         return isset($opts['single_sidebar_position']) ? $opts['single_sidebar_position'] : 'right';
     }
 
     public static function get_single_sidebar_elementor_id() {
-        $opts = get_option('mytheme_options', array());
+        $opts = class_exists('Themsah_Theme_Options') ? Themsah_Theme_Options::get_all_options() : array();
         return ! empty($opts['single_sidebar_elementor']) ? absint($opts['single_sidebar_elementor']) : 0;
     }
 

@@ -1,5 +1,5 @@
 <?php if (! defined('ABSPATH')) exit; ?>
-<?php if ( Themsah_Theme_Template_Loader::is_elementor_preview_context() ) return; ?>
+<?php // Always render default header; Elementor overrides via class-template-loader when a template is chosen ?>
 <?php
 $primary = Themsah_Theme_Options::get_option('primary_color', '#2663ff');
 ?>

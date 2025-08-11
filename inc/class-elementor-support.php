@@ -5,15 +5,37 @@ class Themsah_Theme_Elementor_Support {
     public function __construct() {
         // Register widgets and category if Elementor is loaded
         add_action('init', array($this,'maybe_register_hooks'), 20);
+        // Ensure registration when Elementor finishes booting
+        add_action('elementor/init', array($this,'maybe_register_hooks'), 5);
+        // Ensure editor always sees a content region
+        add_action('wp', array($this,'maybe_force_content_region'));
     }
 
     public function maybe_register_hooks() {
         if ( class_exists('\Elementor\Plugin') ) {
             add_action('elementor/elements/categories_registered', [$this, 'register_category']);
+            // Support both new and legacy Elementor hooks for widget registration
             add_action('elementor/widgets/register', [$this, 'register_widgets']);
+            add_action('elementor/widgets/widgets_registered', [$this, 'register_widgets']);
             // Register custom fonts with Elementor (so user can choose in typography controls)
             add_action('elementor/fonts/wordpress', [$this, 'register_custom_fonts']);
         }
+    }
+
+    /**
+     * Ensure the_content exists while Elementor editor/preview is loading
+     */
+    public function maybe_force_content_region() {
+        if ( is_admin() ) return;
+        if ( ! class_exists('\\Elementor\\Plugin') ) return;
+        $is_editor = isset($_GET['elementor-preview']) || isset($_GET['elementor-iframe']);
+        if ( ! $is_editor ) return;
+        add_filter('the_content', function($content){
+            if ( trim($content) === '' ) {
+                return '<div style="min-height:100vh"></div>';
+            }
+            return $content;
+        }, 0);
     }
 
     public function register_category($elements_manager) {
@@ -26,10 +48,22 @@ class Themsah_Theme_Elementor_Support {
         );
     }
 
-    public function register_widgets($widgets_manager) {
+    public function register_widgets($widgets_manager = null) {
+        // Fallback for legacy hook that passes no parameter
+        if ( ! $widgets_manager && class_exists('\\Elementor\\Plugin') ) {
+            try { $widgets_manager = \Elementor\Plugin::instance()->widgets_manager; } catch ( \Throwable $e ) { $widgets_manager = null; }
+        }
+        if ( ! $widgets_manager ) { return; }
+
         $widgets_dir = get_template_directory() . '/widgets';
+        // Ensure our base class is loaded now that Elementor core is fully loaded
+        $base_file = trailingslashit($widgets_dir) . 'class-elementor-widget-base.php';
+        if ( file_exists($base_file) ) {
+            require_once $base_file;
+        }
         // 1) Legacy flat files: widgets/widget-*.php
         foreach ( glob( $widgets_dir . '/*.php' ) as $file ) {
+            if ( basename($file) === 'class-elementor-widget-base.php' ) { continue; }
             require_once $file;
             $base = basename($file, '.php');
             $slug = preg_replace('/^widget-/', '', $base);
@@ -103,22 +137,23 @@ class Themsah_Theme_Elementor_Support {
      * Expose custom fonts (uploaded in theme options) to Elementor font list
      */
     public function register_custom_fonts( $fonts_manager ) {
-        $opts = get_option('mytheme_options', array());
-        if ( empty($opts['custom_fonts']) || ! is_array($opts['custom_fonts']) ) return;
-        // New schema: ['family' => 'Name', 'weights' => [ {weight, woff2, woff, ttf}, ... ]]
+        // Use unified accessor which supports both new and legacy option names
+        $opts = Themsah_Theme_Options::get_all_options();
+        if ( ! is_array($opts) ) return;
+
+        // New schema: multiple families
+        if ( ! empty($opts['custom_fonts_list']) && is_array($opts['custom_fonts_list']) ) {
+            foreach ( $opts['custom_fonts_list'] as $fam ) {
+                if ( empty($fam['family']) ) continue;
+                $fonts_manager->add_font( $fam['family'], 'custom' );
+            }
+            return;
+        }
+
+        // Legacy single-family
         if ( ! empty($opts['custom_fonts']['family']) ) {
             $fonts_manager->add_font( $opts['custom_fonts']['family'], 'custom' );
             return;
-        }
-        // Backward compatibility: array of rows with 'name'
-        $families = array();
-        foreach ( $opts['custom_fonts'] as $font ) {
-            if ( empty($font['name']) ) continue;
-            $families[] = $font['name'];
-        }
-        $families = array_unique($families);
-        foreach ( $families as $family ) {
-            $fonts_manager->add_font( $family, 'custom' );
         }
     }
 }

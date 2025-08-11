@@ -26,12 +26,13 @@
             }
             var title = 'انتخاب فایل';
             var libTypes = null; // null shows all media library items
-            if ( btn.data('target') === 'woff' || btn.data('target') === 'woff2' || btn.data('target') === 'ttf' ) {
-                title = 'انتخاب فایل فونت';
-                libTypes = ['application/font-woff','application/font-woff2','font/ttf','application/octet-stream'];
-            } else if ( btn.data('target') === 'header_logo_image' ) {
+            var insideFonts = btn.closest('#tab-fonts').length > 0 || btn.closest('.themsah-font-family').length > 0;
+            if ( btn.data('target') === 'header_logo_image' ) {
                 title = 'انتخاب تصویر لوگو';
                 libTypes = ['image'];
+            } else if ( btn.data('target') === 'woff' || btn.data('target') === 'woff2' || insideFonts ) {
+                title = 'انتخاب فایل فونت';
+                libTypes = ['application/font-woff','application/font-woff2','application/octet-stream'];
             }
             mediaFrame = wp.media({
                 title: title,
@@ -52,13 +53,100 @@
             mediaFrame.open();
         });
 
-        // Repeater add/remove (new schema: custom_fonts[family], custom_fonts[weights][index][...])
-        $('#themsah-font-add').on('click', function(e){
+        // Families: add new family
+        $('#themsah-font-family-add').on('click', function(e){
             e.preventDefault();
-            var index = $('#themsah-fonts-repeater tbody tr').length;
+            var fi = $('#themsah-fonts-families .themsah-font-family').length;
+            var html = '<div class="themsah-font-family" data-index="'+fi+'">\
+                <div class="family-head">\
+                    <strong>خانواده فونت</strong>\
+                    <button class="button button-link-delete themsah-font-family-remove" type="button">&times;</button>\
+                </div>\
+                <table class="form-table">\
+                    <tr>\
+                        <th>نام خانواده</th>\
+                        <td><input type="text" class="regular-text" name="themsah_theme_options[custom_fonts_list]['+fi+'][family]" placeholder="مثال: IRANSansX" /></td>\
+                    </tr>\
+                    <tr>\
+                        <th>نوع فونت</th>\
+                        <td>\
+                            <label><input type="radio" name="themsah_theme_options[custom_fonts_list]['+fi+'][type]" value="static" class="family-type-radio" checked> ساده</label>\
+                            &nbsp; &nbsp;\
+                            <label><input type="radio" name="themsah_theme_options[custom_fonts_list]['+fi+'][type]" value="variable" class="family-type-radio"> Variable</label>\
+                        </td>\
+                    </tr>\
+                </table>\
+                <div class="family-static-fields" style="display:block">\
+                    <table class="form-table themsah-fonts-repeater" data-family-index="'+fi+'">\
+                        <thead>\
+                            <tr>\
+                                <th>وزن</th>\
+                                <th>WOFF2</th>\
+                                <th>WOFF</th>\
+                                <th></th>\
+                            </tr>\
+                        </thead>\
+                        <tbody></tbody>\
+                    </table>\
+                    <p><button class="button themsah-font-add-weight" type="button" data-family-index="'+fi+'">+ افزودن وزن فونت</button></p>\
+                </div>\
+                <div class="family-variable-fields" style="display:none">\
+                    <table class="form-table">\
+                        <tr>\
+                            <th>بازه وزن</th>\
+                            <td>\
+                                <input type="number" min="1" max="1000" step="1" name="themsah_theme_options[custom_fonts_list]['+fi+'][min]" value="100" style="width:100px"> -\
+                                <input type="number" min="1" max="1000" step="1" name="themsah_theme_options[custom_fonts_list]['+fi+'][max]" value="900" style="width:100px">\
+                                <p class="description">معمولاً 100 تا 900</p>\
+                            </td>\
+                        </tr>\
+                        <tr>\
+                            <th>فایل WOFF2</th>\
+                            <td>\
+                                <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list]['+fi+'][woff2]" />\
+                                <button class="button themsah-media-upload" type="button">انتخاب</button>\
+                            </td>\
+                        </tr>\
+                        <tr>\
+                            <th>فایل WOFF (اختیاری)</th>\
+                            <td>\
+                                <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list]['+fi+'][woff]" />\
+                                <button class="button themsah-media-upload" type="button">انتخاب</button>\
+                            </td>\
+                        </tr>\
+                    </table>\
+                </div>\
+            </div>';
+            $('#themsah-fonts-families').append(html);
+        });
+
+        $(document).on('click', '.themsah-font-family-remove', function(e){
+            e.preventDefault();
+            $(this).closest('.themsah-font-family').remove();
+        });
+
+        // Toggle type fields
+        $(document).on('change', '.family-type-radio', function(){
+            var wrap = $(this).closest('.themsah-font-family');
+            var type = $(this).val();
+            if ( type === 'variable' ) {
+                wrap.find('.family-static-fields').hide();
+                wrap.find('.family-variable-fields').show();
+            } else {
+                wrap.find('.family-variable-fields').hide();
+                wrap.find('.family-static-fields').show();
+            }
+        });
+
+        // Add weight row per family
+        $(document).on('click', '.themsah-font-add-weight', function(e){
+            e.preventDefault();
+            var fi = $(this).data('family-index');
+            var tbody = $('.themsah-fonts-repeater[data-family-index="'+fi+'"]').find('tbody');
+            var index = tbody.find('tr').length;
             var row = $('<tr>\
                 <td>\
-                    <select name="themsah_theme_options[custom_fonts][weights]['+index+'][weight]">\
+                    <select name="themsah_theme_options[custom_fonts_list]['+fi+'][weights]['+index+'][weight]">\
                         <option value="100">100</option>\
                         <option value="200">200</option>\
                         <option value="300">300</option>\
@@ -71,20 +159,16 @@
                     </select>\
                 </td>\
                 <td>\
-                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts][weights]['+index+'][woff2]" />\
-                    <button class="button themsah-media-upload" data-target="woff2">انتخاب</button>\
+                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list]['+fi+'][weights]['+index+'][woff2]" />\
+                    <button class="button themsah-media-upload" type="button">انتخاب</button>\
                 </td>\
                 <td>\
-                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts][weights]['+index+'][woff]" />\
-                    <button class="button themsah-media-upload" data-target="woff">انتخاب</button>\
+                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts_list]['+fi+'][weights]['+index+'][woff]" />\
+                    <button class="button themsah-media-upload" type="button">انتخاب</button>\
                 </td>\
-                <td>\
-                    <input type="text" class="regular-text themsah-media-url" name="themsah_theme_options[custom_fonts][weights]['+index+'][ttf]" />\
-                    <button class="button themsah-media-upload" data-target="ttf">انتخاب</button>\
-                </td>\
-                <td><button class="button button-link-delete themsah-font-remove">&times;</button></td>\
+                <td><button class="button button-link-delete themsah-font-remove" type="button">&times;</button></td>\
             </tr>');
-            $('#themsah-fonts-repeater tbody').append(row);
+            tbody.append(row);
         });
 
         $(document).on('click', '.themsah-font-remove', function(e){
