@@ -10,8 +10,30 @@
 .themsah-admin-wrap .themsah-tab-nav li.active{background:#fff;font-weight:700;color:#0f172a}
 
 /* Content area */
-.themsah-admin-wrap .themsah-tab-content{display:none;padding:22px;flex:1 1 auto;min-width:0;overflow:auto;background:#fff}
+.themsah-admin-wrap .themsah-tab-content{display:none;padding:22px;flex:1 1 auto;min-width:0;overflow:visible;background:#fff}
 .themsah-admin-wrap .themsah-tab-content.active{display:block}
+
+/* Subtabs (for custom CSS) */
+.themsah-subtabs{display:flex;flex-direction:column;gap:10px;height:100%}
+.themsah-subtab-nav{display:flex;gap:8px;list-style:none;margin:0 0 6px 0;padding:0;background:transparent;border:none}
+.themsah-subtab-nav li{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc}
+.themsah-subtab-nav li.active{background:#fff;font-weight:700;box-shadow:0 2px 8px rgba(16,24,40,.06)}
+.themsah-subtab-content{display:none;min-height:50vh}
+.themsah-subtab-content.active{display:block;flex:1}
+.codemirror-css,.codemirror-js{font-family:Consolas,monospace}
+/* CodeMirror polish */
+.themsah-admin-wrap .CodeMirror{direction:ltr;text-align:left;height:100%;min-height:360px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+.themsah-admin-wrap .CodeMirror-gutters{background:#f8fafc;border-inline-end:1px solid #e5e7eb;border-radius:10px 0 0 10px}
+.themsah-admin-wrap .CodeMirror-gutters{left:0;right:auto}
+.themsah-admin-wrap .CodeMirror-linenumbers{left:0}
+.themsah-admin-wrap .CodeMirror pre{font-family:Consolas,Monaco,monospace;font-size:13px}
+.themsah-admin-wrap .CodeMirror-scroll{max-height:none}
+.themsah-admin-wrap .CodeMirror-scroll{overflow-y:hidden !important}
+.themsah-admin-wrap .themsah-subtab-content textarea{display:none} /* hidden once editor mounts */
+
+/* Make CSS/JS editors fill their parent area */
+#tab-custom-css{min-height:60vh}
+#tab-custom-js{min-height:60vh}
 
 /* Controls */
 .themsah-admin-wrap .themsah-select{min-width:260px;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;background:#fff}

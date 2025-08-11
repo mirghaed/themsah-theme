@@ -6,6 +6,7 @@ class Themsah_Theme_Setup {
         add_action('after_setup_theme', [$this, 'setup']);
         add_action('init', [$this, 'register_menus']);
         add_action('widgets_init', [$this, 'widgets_init']);
+        add_action('init', [$this, 'register_custom_post_type']);
     }
 
     public function setup() {
@@ -43,6 +44,41 @@ class Themsah_Theme_Setup {
             'after_widget' => '</section>',
             'before_title' => '<h4>',
             'after_title' => '</h4>',
+        ));
+    }
+
+    public function register_custom_post_type() {
+        $opts = Themsah_Theme_Options::get_all_options();
+        $slug = isset($opts['cpt_slug']) && $opts['cpt_slug'] ? sanitize_title($opts['cpt_slug']) : 'portfolio';
+        $menu_name = isset($opts['cpt_menu_name']) && $opts['cpt_menu_name'] ? sanitize_text_field($opts['cpt_menu_name']) : __('پروژه‌ها','themsah-theme');
+
+        register_post_type('themsah_project', array(
+            'labels' => array(
+                'name' => $menu_name,
+                'singular_name' => __('پروژه','themsah-theme'),
+                'add_new_item' => __('افزودن پروژه','themsah-theme'),
+                'edit_item' => __('ویرایش پروژه','themsah-theme'),
+                'new_item' => __('پروژه جدید','themsah-theme'),
+                'view_item' => __('مشاهده پروژه','themsah-theme'),
+                'search_items' => __('جستجوی پروژه','themsah-theme'),
+                'menu_name' => $menu_name,
+            ),
+            'public' => true,
+            'has_archive' => true,
+            'rewrite' => array('slug' => $slug),
+            'menu_icon' => 'dashicons-portfolio',
+            'supports' => array('title','editor','thumbnail','excerpt'),
+            'show_in_rest' => true,
+        ));
+
+        register_taxonomy('themsah_project_cat', 'themsah_project', array(
+            'labels' => array(
+                'name' => __('دسته‌های پروژه','themsah-theme'),
+                'singular_name' => __('دسته پروژه','themsah-theme'),
+            ),
+            'public' => true,
+            'hierarchical' => true,
+            'show_in_rest' => true,
         ));
     }
 }

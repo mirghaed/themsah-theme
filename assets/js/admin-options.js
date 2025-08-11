@@ -15,6 +15,19 @@
             $('#' + tab).addClass('active');
         });
 
+        // Subtabs (custom CSS)
+        $(document).on('click', '.themsah-subtab-nav li', function(){
+            var sub = $(this).data('subtab');
+            $(this).closest('.themsah-subtabs').find('.themsah-subtab-nav li').removeClass('active');
+            $(this).addClass('active');
+            $(this).closest('.themsah-subtabs').find('.themsah-subtab-content').removeClass('active');
+            var target = $('#' + sub).addClass('active');
+            // Refresh CodeMirror inside the newly opened pane
+            target.find('.CodeMirror').each(function(){
+                try { this.CodeMirror && this.CodeMirror.refresh(); } catch(e){}
+            });
+        });
+
         // Media uploader for repeater rows
         var mediaFrame;
         $(document).on('click', '.themsah-media-upload', function(e){
@@ -26,6 +39,7 @@
             }
             var title = 'انتخاب فایل';
             var libTypes = null; // null shows all media library items
+            var multiple = false;
             var insideFonts = btn.closest('#tab-fonts').length > 0 || btn.closest('.themsah-font-family').length > 0;
             if ( btn.data('target') === 'header_logo_image' ) {
                 title = 'انتخاب تصویر لوگو';
@@ -33,22 +47,27 @@
             } else if ( btn.data('target') === 'woff' || btn.data('target') === 'woff2' || insideFonts ) {
                 title = 'انتخاب فایل فونت';
                 libTypes = ['application/font-woff','application/font-woff2','application/octet-stream'];
+            } else if ( btn.data('multiple') ) {
+                multiple = true; title = 'انتخاب تصاویر'; libTypes = ['image'];
+            } else if ( btn.data('library') === 'video' ) {
+                libTypes = ['video']; title = 'انتخاب ویدئو';
             }
             mediaFrame = wp.media({
                 title: title,
-                multiple: false,
+                multiple: multiple,
                 library: libTypes ? { type: libTypes } : undefined
             });
             mediaFrame.on('select', function(){
-                var attachment = mediaFrame.state().get('selection').first().toJSON();
                 var target = btn.data('target');
-                var input;
-                if ( target ) {
-                    input = $('#'+target);
+                var input = target ? $('#'+target) : btn.closest('td').find('input.themsah-media-url');
+                if ( multiple ) {
+                    var urls = [];
+                    mediaFrame.state().get('selection').each(function(a){ urls.push(a.toJSON().url); });
+                    if ( input && input.length ) input.val(urls.join(','));
                 } else {
-                    input = btn.closest('td').find('input.themsah-media-url');
+                    var attachment = mediaFrame.state().get('selection').first().toJSON();
+                    if ( input && input.length ) input.val(attachment.url);
                 }
-                if ( input && input.length ) input.val(attachment.url);
             });
             mediaFrame.open();
         });
@@ -203,6 +222,75 @@
             }).always(function(){
                 $btn.prop('disabled', false).val(original);
             });
+        });
+
+        // Initialize CodeMirror editors if available
+        function resizeCodeMirror(cm){
+            try {
+                var lc = cm.lineCount();
+                var lh = parseFloat(window.getComputedStyle(cm.getWrapperElement()).lineHeight) || 18;
+                var height = Math.max(360, (lc + 1) * lh + 24);
+                cm.setSize('100%', height + 'px');
+                cm.refresh();
+            } catch(e){}
+        }
+        function refreshLater(cm){
+            [0, 60, 180].forEach(function(t){ setTimeout(function(){ try{ resizeCodeMirror(cm); }catch(e){} }, t); });
+        }
+        function ensureRendered(cm){
+            var attempts = 0;
+            var timer = setInterval(function(){
+                attempts++;
+                try {
+                    var el = cm.getWrapperElement();
+                    if ( el && el.offsetWidth > 0 && el.offsetHeight > 0 ) {
+                        resizeCodeMirror(cm);
+                        clearInterval(timer);
+                    }
+                } catch(e){}
+                if ( attempts > 20 ) clearInterval(timer);
+            }, 80);
+        }
+
+        if ( window.wp && wp.codeEditor ) {
+            $('.codemirror-css, .codemirror-js').each(function(){
+                var settings = wp.codeEditor.defaultSettings ? JSON.parse(JSON.stringify(wp.codeEditor.defaultSettings)) : { codemirror:{} };
+                if (!settings.codemirror) settings.codemirror = {};
+                if ( $(this).hasClass('codemirror-css') ) settings.codemirror.mode = 'css';
+                if ( $(this).hasClass('codemirror-js') ) settings.codemirror.mode = 'javascript';
+                settings.codemirror.lineNumbers = true;
+                settings.codemirror.direction = 'ltr';
+                settings.codemirror.viewportMargin = Infinity; // auto-height
+                settings.codemirror.rtlMoveVisually = true;
+                settings.codemirror.gutters = ["CodeMirror-linenumbers"];
+                settings.codemirror.lineWrapping = false;
+                var cm = wp.codeEditor.initialize( this, settings );
+                // Force refresh to fix single-line overlay bug
+                setTimeout(function(){ try { if ( cm && cm.codemirror ) { resizeCodeMirror(cm.codemirror); } } catch(e){} }, 0);
+                setTimeout(function(){ try { if ( cm && cm.codemirror ) { resizeCodeMirror(cm.codemirror); } } catch(e){} }, 120);
+                try {
+                    if ( cm && cm.codemirror ) {
+                        $(this).data('themsah-cm', cm.codemirror);
+                        cm.codemirror.on('changes', function(inst){ resizeCodeMirror(inst); });
+                        $(window).on('resize', function(){ resizeCodeMirror(cm.codemirror); });
+                        // Extra ensure on fonts/css ready
+                        refreshLater(cm.codemirror);
+                        ensureRendered(cm.codemirror);
+                    }
+                } catch(e){}
+            });
+        }
+
+        // Final pass after page fully loaded to be sure editors show contents
+        $(window).on('load', function(){
+            $('.CodeMirror').each(function(){ try{ this.CodeMirror && resizeCodeMirror(this.CodeMirror); }catch(e){} });
+        });
+
+        // When switching main tabs (sidebar tabs), refresh editors in the active panel
+        $(document).on('click', '.themsah-tab-nav li', function(){
+            setTimeout(function(){
+                $('.themsah-tab-content.active .CodeMirror').each(function(){ try{ this.CodeMirror && resizeCodeMirror(this.CodeMirror); }catch(e){} });
+            }, 10);
         });
     });
 })(jQuery);

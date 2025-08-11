@@ -32,6 +32,11 @@ class Themsah_Theme_Options {
         wp_enqueue_media();
         wp_enqueue_script('themsah-admin-options', get_template_directory_uri() . '/assets/js/admin-options.js', array('jquery','wp-color-picker'), '1.3.0', true);
         wp_enqueue_style('themsah-admin-options', get_template_directory_uri() . '/assets/css/admin-options.css', array(), '1.3.0');
+        // CodeMirror assets bundled in WP
+        wp_enqueue_code_editor(array('type' => 'text/css'));
+        wp_enqueue_code_editor(array('type' => 'application/javascript'));
+        wp_enqueue_script('code-editor');
+        wp_enqueue_style('code-editor');
         wp_localize_script('themsah-admin-options', 'THEMSAH_OPTIONS', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('themsah_options_save'),
@@ -59,6 +64,9 @@ class Themsah_Theme_Options {
         // Single post layout & sidebar
         $output['single_sidebar_position'] = isset($input['single_sidebar_position']) ? sanitize_text_field($input['single_sidebar_position']) : 'right';
         $output['single_sidebar_elementor'] = isset($input['single_sidebar_elementor']) ? absint($input['single_sidebar_elementor']) : '';
+        // CPT options
+        $output['cpt_menu_name'] = isset($input['cpt_menu_name']) ? sanitize_text_field($input['cpt_menu_name']) : '';
+        $output['cpt_slug'] = isset($input['cpt_slug']) ? sanitize_title($input['cpt_slug']) : 'portfolio';
         // Archive/Single per post type mapping
         $output['archive_templates'] = array();
         $output['single_templates'] = array();
@@ -88,6 +96,26 @@ class Themsah_Theme_Options {
                 }
             }
         }
+
+        // Custom CSS buckets (store raw for admins)
+        $output['custom_css'] = array(
+            'global' => '',
+            'desktop' => '',
+            'tablet' => '',
+            'mobile_landscape' => '',
+            'mobile' => '',
+            'admin' => '',
+        );
+        if ( isset($input['custom_css']) && is_array($input['custom_css']) ) {
+            foreach ( $output['custom_css'] as $k => $_ ) {
+                if ( isset($input['custom_css'][$k]) ) {
+                    $output['custom_css'][$k] = (string) $input['custom_css'][$k];
+                }
+            }
+        }
+
+        // Custom JS (on document ready)
+        $output['custom_js'] = isset($input['custom_js']) ? (string) $input['custom_js'] : '';
 
         // New: Multiple font families with support for variable fonts
         $output['custom_fonts_list'] = array();
@@ -181,6 +209,17 @@ class Themsah_Theme_Options {
             'custom_fonts_list' => array(),
             'single_sidebar_position' => 'right',
             'single_sidebar_elementor' => '',
+            'custom_css' => array(
+                'global' => '',
+                'desktop' => '',
+                'tablet' => '',
+                'mobile_landscape' => '',
+                'mobile' => '',
+                'admin' => '',
+            ),
+            'custom_js' => '',
+            'cpt_menu_name' => '',
+            'cpt_slug' => 'portfolio',
         ));
         // Guards for legacy saved options
         if ( empty($opts['custom_fonts']) || ! is_array($opts['custom_fonts']) ) {
@@ -218,9 +257,12 @@ class Themsah_Theme_Options {
                     <ul class="themsah-tab-nav">
                         <li class="active" data-tab="tab-style"><?php esc_html_e('استایل', 'themsah-theme'); ?></li>
                         <li data-tab="tab-header"><?php esc_html_e('هدر', 'themsah-theme'); ?></li>
+                        <li data-tab="tab-cpt"><?php esc_html_e('پست تایپ اختصاصی', 'themsah-theme'); ?></li>
                         <li data-tab="tab-elementor"><?php esc_html_e('قالب‌های المنتور', 'themsah-theme'); ?></li>
                         <li data-tab="tab-templates"><?php esc_html_e('قالب‌های صفحات', 'themsah-theme'); ?></li>
                         <li data-tab="tab-fonts"><?php esc_html_e('فونت‌ها', 'themsah-theme'); ?></li>
+                        <li data-tab="tab-custom-css"><?php esc_html_e('CSS سفارشی', 'themsah-theme'); ?></li>
+                        <li data-tab="tab-custom-js"><?php esc_html_e('JS سفارشی', 'themsah-theme'); ?></li>
                     </ul>
 
                     <div class="themsah-tab-content active" id="tab-style">
@@ -257,6 +299,69 @@ class Themsah_Theme_Options {
                                 </td>
                             </tr>
                         </table>
+                        <hr />
+                        <h3><?php esc_html_e('پست تایپ اختصاصی', 'themsah-theme'); ?></h3>
+                        <table class="form-table">
+                            <tr>
+                                <th><?php esc_html_e('نام نمایشی در منوی پیشخوان', 'themsah-theme'); ?></th>
+                                <td><input type="text" name="themsah_theme_options[cpt_menu_name]" class="regular-text" value="<?php echo esc_attr( isset($opts['cpt_menu_name']) ? $opts['cpt_menu_name'] : '' ); ?>" placeholder="پروژه‌ها" /></td>
+                            </tr>
+                            <tr>
+                                <th><?php esc_html_e('اسلاگ (پیوند یکتا)', 'themsah-theme'); ?></th>
+                                <td><input type="text" name="themsah_theme_options[cpt_slug]" class="regular-text" value="<?php echo esc_attr( isset($opts['cpt_slug']) ? $opts['cpt_slug'] : 'portfolio' ); ?>" placeholder="portfolio" />
+                                <p class="description"><?php esc_html_e('پس از تغییر اسلاگ، یک‌بار پیوندهای یکتا را در تنظیمات > پیوندهای یکتا ذخیره کنید.', 'themsah-theme'); ?></p></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="themsah-tab-content" id="tab-cpt">
+                        <table class="form-table">
+                            <tr>
+                                <th><?php esc_html_e('نام نمایشی در منوی پیشخوان', 'themsah-theme'); ?></th>
+                                <td><input type="text" name="themsah_theme_options[cpt_menu_name]" class="regular-text" value="<?php echo esc_attr( isset($opts['cpt_menu_name']) ? $opts['cpt_menu_name'] : '' ); ?>" placeholder="پروژه‌ها" /></td>
+                            </tr>
+                            <tr>
+                                <th><?php esc_html_e('اسلاگ (پیوند یکتا)', 'themsah-theme'); ?></th>
+                                <td><input type="text" name="themsah_theme_options[cpt_slug]" class="regular-text" value="<?php echo esc_attr( isset($opts['cpt_slug']) ? $opts['cpt_slug'] : 'portfolio' ); ?>" placeholder="portfolio" />
+                                <p class="description"><?php esc_html_e('پس از تغییر اسلاگ، یک‌بار پیوندهای یکتا را در تنظیمات > پیوندهای یکتا ذخیره کنید.', 'themsah-theme'); ?></p></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="themsah-tab-content" id="tab-custom-css">
+                        <p class="description"><?php esc_html_e('CSS سفارشی را در تب‌های زیر وارد کنید. این کدها بدون فیلتر برای مدیر سایت ذخیره و در خروجی تزریق می‌شوند.', 'themsah-theme'); ?></p>
+                        <div class="themsah-subtabs">
+                            <ul class="themsah-subtab-nav">
+                                <li class="active" data-subtab="css-global">🎯 <?php esc_html_e('عمومی', 'themsah-theme'); ?></li>
+                                <li data-subtab="css-desktop">🖥️ <?php esc_html_e('دسکتاپ', 'themsah-theme'); ?></li>
+                                <li data-subtab="css-tablet">📱 <?php esc_html_e('تبلت', 'themsah-theme'); ?></li>
+                                <li data-subtab="css-ml">📱↔️ <?php esc_html_e('موبایل لنداسکیپ', 'themsah-theme'); ?></li>
+                                <li data-subtab="css-mobile">📱 <?php esc_html_e('موبایل', 'themsah-theme'); ?></li>
+                                <li data-subtab="css-admin">⚙️ <?php esc_html_e('داشبورد', 'themsah-theme'); ?></li>
+                            </ul>
+                            <div class="themsah-subtab-content active" id="css-global">
+                                <textarea id="themsah-css-global" name="themsah_theme_options[custom_css][global]" class="large-text code codemirror-css" rows="12"><?php echo esc_textarea( isset($opts['custom_css']['global']) ? $opts['custom_css']['global'] : '' ); ?></textarea>
+                            </div>
+                            <div class="themsah-subtab-content" id="css-desktop">
+                                <textarea id="themsah-css-desktop" name="themsah_theme_options[custom_css][desktop]" class="large-text code codemirror-css" rows="10"><?php echo esc_textarea( isset($opts['custom_css']['desktop']) ? $opts['custom_css']['desktop'] : '' ); ?></textarea>
+                            </div>
+                            <div class="themsah-subtab-content" id="css-tablet">
+                                <textarea id="themsah-css-tablet" name="themsah_theme_options[custom_css][tablet]" class="large-text code codemirror-css" rows="10"><?php echo esc_textarea( isset($opts['custom_css']['tablet']) ? $opts['custom_css']['tablet'] : '' ); ?></textarea>
+                            </div>
+                            <div class="themsah-subtab-content" id="css-ml">
+                                <textarea id="themsah-css-ml" name="themsah_theme_options[custom_css][mobile_landscape]" class="large-text code codemirror-css" rows="10"><?php echo esc_textarea( isset($opts['custom_css']['mobile_landscape']) ? $opts['custom_css']['mobile_landscape'] : '' ); ?></textarea>
+                            </div>
+                            <div class="themsah-subtab-content" id="css-mobile">
+                                <textarea id="themsah-css-mobile" name="themsah_theme_options[custom_css][mobile]" class="large-text code codemirror-css" rows="10"><?php echo esc_textarea( isset($opts['custom_css']['mobile']) ? $opts['custom_css']['mobile'] : '' ); ?></textarea>
+                            </div>
+                            <div class="themsah-subtab-content" id="css-admin">
+                                <textarea id="themsah-css-admin" name="themsah_theme_options[custom_css][admin]" class="large-text code codemirror-css" rows="10"><?php echo esc_textarea( isset($opts['custom_css']['admin']) ? $opts['custom_css']['admin'] : '' ); ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="themsah-tab-content" id="tab-custom-js">
+                        <p class="description"><?php esc_html_e('JS سفارشی (on document ready). نیازی نیست $(document).ready بنویسید؛ کد شما به‌صورت خودکار در آن اجرا می‌شود.', 'themsah-theme'); ?></p>
+                        <textarea id="themsah-custom-js" name="themsah_theme_options[custom_js]" class="large-text code codemirror-js" rows="14" placeholder="// کد خود را اینجا بنویسید... "><?php echo esc_textarea( isset($opts['custom_js']) ? $opts['custom_js'] : '' ); ?></textarea>
                     </div>
 
                     <div class="themsah-tab-content" id="tab-header">
@@ -322,7 +427,16 @@ class Themsah_Theme_Options {
                         <table class="form-table">
                             <?php foreach ( $public_post_types as $pt => $obj ) : if ( in_array($pt, array('attachment','elementor_library')) ) continue; ?>
                             <tr>
-                                <th><?php esc_html_e('آرشیو پست تایپ', 'themsah-theme'); ?></th>
+                                <th>
+                                    <?php
+                                    $label = '';
+                                    if ( $pt === 'post' ) { $label = __('آرشیو بلاگ','themsah-theme'); }
+                                    elseif ( $pt === 'page' ) { $label = __('تمپلیت برگه‌ها (اختصاص آرشیو ندارد)','themsah-theme'); }
+                                    elseif ( $pt === 'themsah_project' ) { $label = __('آرشیو پست تایپ اختصاصی (پروژه‌ها)','themsah-theme'); }
+                                    else { $label = sprintf(__('آرشیو %s','themsah-theme'), $obj->labels->name); }
+                                    echo esc_html($label);
+                                    ?>
+                                </th>
                                 <td>
                                     <select name="themsah_theme_options[archive_templates][<?php echo esc_attr($pt); ?>]" class="themsah-select">
                                         <option value=""><?php esc_html_e('-- پیش‌فرض قالب --', 'themsah-theme'); ?></option>
@@ -334,7 +448,16 @@ class Themsah_Theme_Options {
                                 </td>
                             </tr>
                             <tr>
-                                <th><?php esc_html_e('سینگل پست تایپ', 'themsah-theme'); ?></th>
+                                <th>
+                                    <?php
+                                    $label = '';
+                                    if ( $pt === 'post' ) { $label = __('سینگل بلاگ','themsah-theme'); }
+                                    elseif ( $pt === 'page' ) { $label = __('تمپلیت برگه‌ها','themsah-theme'); }
+                                    elseif ( $pt === 'themsah_project' ) { $label = __('سینگل پست تایپ اختصاصی (پروژه‌ها)','themsah-theme'); }
+                                    else { $label = sprintf(__('سینگل %s','themsah-theme'), $obj->labels->singular_name ?: $obj->labels->name); }
+                                    echo esc_html($label);
+                                    ?>
+                                </th>
                                 <td>
                                     <select name="themsah_theme_options[single_templates][<?php echo esc_attr($pt); ?>]" class="themsah-select">
                                         <option value=""><?php esc_html_e('-- پیش‌فرض قالب --', 'themsah-theme'); ?></option>
